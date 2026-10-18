@@ -6,8 +6,10 @@ from tkinter import ttk
 TABS = [
     ("Students", "tab_students", "StudentsTab"),
     ("Courses", "tab_courses", "CoursesTab"),
-    ("Enrollments & Progress", "tab_progress", "ProgressTab"),
+    ("Enrollments", "tab_enrollments", "EnrollmentsTab"),
+    ("Progress", "tab_progress", "ProgressTab"),
     ("Early Warning", "tab_warning", "WarningTab"),
+    ("Reports", "tab_reports", "ReportsTab"),
     ("Certificates", "tab_certificates", "CertificateTab"),
 ]
 
@@ -15,7 +17,7 @@ TABS = [
 def main():
     root = tk.Tk()
     root.title("E-learning Platform Database")
-    root.geometry("900x560")
+    root.geometry("940x580")
 
     notebook = ttk.Notebook(root)
     notebook.pack(fill="both", expand=True)
