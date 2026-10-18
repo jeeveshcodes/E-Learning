@@ -15,5 +15,9 @@ students, courses, enrollments, progress and certificates.
 1. Install PostgreSQL and create a database named `elearning`
 2. Run `schema.sql`, then `sample_data.sql`
 3. `pip install -r requirements.txt`
-4. Create `config.py` with your database password
+4. Copy `config.example.py` to `config.py` and put your PostgreSQL password in it
 5. `python gui.py`
+
+
+## Docs
+The project slides and ER diagram are in the `docs/` folder.
