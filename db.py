@@ -108,6 +108,16 @@ def get_enrollments():
     """)
 
 
+def delete_enrollment(enrollment_id):
+    run_query("DELETE FROM enrollments WHERE enrollment_id = %s",
+              (enrollment_id,), fetch=False)
+
+
+def set_enrollment_status(enrollment_id, status):
+    run_query("UPDATE enrollments SET status = %s WHERE enrollment_id = %s",
+              (status, enrollment_id), fetch=False)
+
+
 # ---------- progress ----------
 
 def get_modules(course_id):
@@ -125,6 +135,57 @@ def record_progress(student_id, module_id, score):
         DO UPDATE SET completed = TRUE, score = EXCLUDED.score,
                       completed_on = CURRENT_DATE
     """, (student_id, module_id, score), fetch=False)
+
+
+# ---------- reports ----------
+
+def get_course_completion():
+    """Per course: how many students enrolled, how many finished every module, and the rate."""
+    rows = run_query("""
+        WITH totals AS (
+            SELECT course_id, COUNT(*) AS total
+            FROM modules
+            GROUP BY course_id
+        ),
+        done AS (
+            SELECT p.student_id, m.course_id, COUNT(*) AS done
+            FROM progress p
+            JOIN modules m ON m.module_id = p.module_id
+            WHERE p.completed = TRUE
+            GROUP BY p.student_id, m.course_id
+        )
+        SELECT c.course_id, c.title,
+               COUNT(e.enrollment_id) AS enrolled,
+               COUNT(e.enrollment_id) FILTER (
+                   WHERE COALESCE(t.total, 0) > 0 AND COALESCE(d.done, 0) = t.total
+               ) AS completed
+        FROM courses c
+        LEFT JOIN enrollments e ON e.course_id = c.course_id
+        LEFT JOIN totals t ON t.course_id = c.course_id
+        LEFT JOIN done d ON d.course_id = c.course_id AND d.student_id = e.student_id
+        GROUP BY c.course_id, c.title
+        ORDER BY c.course_id
+    """)
+    for r in rows:
+        r["rate"] = round(100 * r["completed"] / r["enrolled"], 1) if r["enrolled"] else 0.0
+    return rows
+
+
+def get_top_scorers(course_id=None, limit=5):
+    """Students ranked by average score. Pass a course_id to rank within one course."""
+    return run_query("""
+        SELECT s.name,
+               COUNT(p.progress_id)   AS modules_done,
+               ROUND(AVG(p.score), 1) AS avg_score
+        FROM progress p
+        JOIN students s ON s.student_id = p.student_id
+        JOIN modules  m ON m.module_id  = p.module_id
+        WHERE p.completed = TRUE AND p.score IS NOT NULL
+          AND (%s IS NULL OR m.course_id = %s)
+        GROUP BY s.student_id, s.name
+        ORDER BY avg_score DESC, modules_done DESC
+        LIMIT %s
+    """, (course_id, course_id, limit))
 
 
 # ---------- feature 1: early-warning list ----------
@@ -225,5 +286,9 @@ if __name__ == "__main__":
     print("\nEarly-warning list:")
     for r in get_early_warning():
         print(f"  {r['name']:<16} {r['risk']:<7} {r['reason']}")
+    print("\nCourse completion:")
+    for r in get_course_completion():
+        print(f"  {r['title']:<26} {r['enrolled']} enrolled, {r['completed']} completed, {r['rate']}%")
+    print("\nTop scorers:", [(r["name"], r["avg_score"]) for r in get_top_scorers()])
     print("\nVerify CERT-2026-0001:", verify_certificate("CERT-2026-0001"))
     print("Verify FAKE-CODE:     ", verify_certificate("FAKE-CODE"))
